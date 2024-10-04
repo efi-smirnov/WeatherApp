@@ -27,7 +27,7 @@ jobs:
 
       - name: Run flake8
         run: |
-          poetry run flake8 main.py
+          poetry run flake8 weather_app/weather.py  # Updated to reflect the new path
 
       - name: Run pytest
         run: |

@@ -1,10 +1,10 @@
 import pytest
-from unittest.mock import patch
-from main import WeatherApp  # Use absolute import
+from unittest.mock import patch  # Import patch from unittest.mock
+from weather_app.weather import WeatherApp  # Change to absolute import
 
 class TestWeatherApp:
     
-    @patch('main.requests.get')  # Update to absolute path
+    @patch('weather_app.weather.requests.get')  # Use absolute import
     def test_get_weather_data_success(self, mock_get):
         # Mock response for successful weather data retrieval
         mock_get.return_value.status_code = 200
@@ -24,7 +24,7 @@ class TestWeatherApp:
         assert weather_data['wind_direction'] == 180
         assert weather_data['weather_code'] == 1
 
-    @patch('main.requests.get')  # Update to absolute path
+    @patch('weather_app.weather.requests.get')  # Use absolute import
     def test_get_coordinates_success(self, mock_get):
         # Mock response for successful coordinate retrieval
         mock_get.return_value.status_code = 200
@@ -41,7 +41,7 @@ class TestWeatherApp:
         assert lon == 30
         assert city_name == "Helsinki"
 
-    @patch('main.requests.get')  # Update to absolute path
+    @patch('weather_app.weather.requests.get')  # Use absolute import
     def test_get_weather_data_failure(self, mock_get):
         # Mock response for failed weather data retrieval
         mock_get.return_value.status_code = 404
@@ -53,7 +53,7 @@ class TestWeatherApp:
         weather_data = app.get_weather_data(60, 30)
         assert weather_data is None
 
-    @patch('main.requests.get')  # Update to absolute path
+    @patch('weather_app.weather.requests.get')  # Use absolute import
     def test_get_coordinates_failure(self, mock_get):
         # Mock response for failed coordinate retrieval
         mock_get.return_value.status_code = 404
