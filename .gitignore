@@ -1,5 +1,4 @@
 .DC_Store
-poetry.lock
 .vscode
 __pycache__
 .env
