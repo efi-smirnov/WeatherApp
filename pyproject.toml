@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "weatherapp"
+version = "0.1.0"
+description = ""
+authors = ["Evgenii Smirnov <evgenii.smirnov@eficode.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+streamlit = "^1.39.0"
+requests = "^2.32.3"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
