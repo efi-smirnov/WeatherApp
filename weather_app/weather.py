@@ -1,20 +1,17 @@
-from dotenv import load_dotenv
 import streamlit as st
 import requests
-import os
 
-load_dotenv()
 
 class WeatherApp:
     def __init__(self):
         # Open-Meteo does not require an API key
         pass
-    
+
     def get_weather_data(self, lat, lon):
         """Fetch weather data for the given latitude and longitude using Open-Meteo API."""
         base_url = "https://api.open-meteo.com/v1/forecast"
         complete_url = f"{base_url}?latitude={lat}&longitude={lon}&current_weather=true"
-        
+
         # Fetch the data from Open-Meteo API
         response = requests.get(complete_url)
         data = response.json()
@@ -38,7 +35,7 @@ class WeatherApp:
         else:
             st.error(data.get("message", "Failed to retrieve data"))
             return None
-    
+
     def get_coordinates(self):
         """Fetch latitude and longitude from an external API."""
         # Fetch the user's IP-based location
@@ -80,7 +77,7 @@ class WeatherApp:
             )
         else:
             st.error("Weather data not found!")
-    
+
     def run(self):
         """Main method to run the Streamlit weather app."""
         st.set_page_config(layout="centered")  # Center the content
@@ -95,6 +92,7 @@ class WeatherApp:
 
             # Render weather data on the interface
             self.render_weather(weather_data, city_name)
+
 
 # Main entry point
 if __name__ == "__main__":
