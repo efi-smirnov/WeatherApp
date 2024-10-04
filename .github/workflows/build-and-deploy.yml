@@ -1,10 +1,8 @@
 name: Build and Deploy Streamlit Dynamic Application
 
 on:
-  workflow_run:
-    workflows: ["Python CI"]
-    types:
-      - completed
+  push:
+  pull_request:
 
 jobs:
   deployment:
