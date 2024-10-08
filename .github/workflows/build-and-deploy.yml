@@ -105,21 +105,21 @@ jobs:
             fi
           fi
 
-          # Check if the environment already exists
-          existing_env=$(eb list | grep ${env_name})
-          
-          if [ -n "$existing_env" ]; then
-            echo "Environment '${env_name}' already exists. Deploying to existing environment."
-            eb deploy ${env_name} --verbose  # Deploy the updated application to the existing environment
+          # List existing environments and capture the output
+          existing_envs=$(eb list)
+
+          # Check if there are existing environments
+          if [ -z "$existing_envs" ]; then
+            echo "No existing environments found. Creating a new environment."
+            eb create ${env_name} --single --verbose
           else
-            echo "Environment '${env_name}' does not exist. Creating a new environment."
-            if eb create ${env_name} --single --verbose 2>&1 | tee eb_create_log.txt; then
-              echo "Successfully created environment: ${env_name}"
-              eb deploy ${env_name}  # Deploy the Docker image to the new environment
+            # Check if the specific environment exists
+            if echo "$existing_envs" | grep -q "${env_name}"; then
+              echo "Environment '${env_name}' already exists. Deploying to existing environment."
+              eb deploy ${env_name} --verbose
             else
-              echo "Failed to create environment: ${env_name}. Exiting."
-              echo "Error details: $(cat eb_create_log.txt)"  # Log the error details
-              exit 1
+              echo "Existing environments found, but '${env_name}' does not exist. Creating a new environment."
+              eb create ${env_name} --single --verbose
             fi
           fi
 
