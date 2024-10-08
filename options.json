@@ -6,18 +6,13 @@
     },
     {
         "Namespace": "aws:autoscaling:launchconfiguration",
-        "OptionName": "EC2KeyName",
-        "Value": "your-ec2-keypair"
-    },
-    {
-        "Namespace": "aws:autoscaling:launchconfiguration",
         "OptionName": "IamInstanceProfile",
-        "Value": "your-ec2-instance-profile"
+        "Value": "aws-elasticbeanstalk-ec2-role"
     },
     {
         "Namespace": "aws:autoscaling:launchconfiguration",
         "OptionName": "RootVolumeType",
-        "Value": "GP3"
+        "Value": "gp3"
     },
     {
         "Namespace": "aws:elasticbeanstalk:environment",
@@ -25,23 +20,8 @@
         "Value": "SingleInstance"
     },
     {
-        "Namespace": "aws:autoscaling:launchconfiguration",
-        "OptionName": "PublicIp",
-        "Value": "true"
-    },
-    {
         "Namespace": "aws:elasticbeanstalk:healthreporting:system",
         "OptionName": "SystemType",
         "Value": "basic"
-    },
-    {
-        "Namespace": "aws:elasticbeanstalk:environment",
-        "OptionName": "ManagedActionsEnabled",
-        "Value": "false"
-    },
-    {
-        "Namespace": "aws:ec2:instance",
-        "OptionName": "MetadataOptions",
-        "Value": "IMDSv2"
     }
 ]

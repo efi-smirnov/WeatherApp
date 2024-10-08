@@ -91,7 +91,7 @@ jobs:
           fi
       
           env_name="${jira_ticket_id}"  # Create a shorter environment name using the Jira ticket ID
-      
+
           # Initialize the application (will not create it if it already exists)
           if eb init "$app_name" --platform docker --region eu-west-2 --verbose; then
             echo "Application initialized successfully."
@@ -105,7 +105,12 @@ jobs:
             fi
           fi
       
-          # List existing environments and capture the output
+          # get the platform ARN
+          platform_arn=$(aws elasticbeanstalk list-platform-versions \
+            --filters "Type=PlatformBranchName,Operator=begins_with,Values=Docker running on 64bit Amazon Linux 2023" \
+            --query "PlatformSummaryList[0].PlatformArn" --output text | cat)
+
+            # List existing environments and capture the output
           existing_envs=$(eb list)
       
           # Check if there are existing environments
@@ -118,9 +123,9 @@ jobs:
             aws elasticbeanstalk create-environment \
               --application-name "$app_name" \
               --environment-name "$env_name" \
-              --platform-branch-name "$platform_branch" \
+              --platform-arn "$platform_arn" \
               --option-settings file://options.json \
-              --tier "WebServer" \
+              --tier '{"Name":"WebServer","Type":"Standard"}' \
               --cname-prefix "$jira_ticket_id"  # Use Jira ID for CNAME prefix
           else
             # Check if the specific environment exists
@@ -137,9 +142,9 @@ jobs:
               aws elasticbeanstalk create-environment \
                 --application-name "$app_name" \
                 --environment-name "$env_name" \
-                --platform-branch-name "$platform_branch" \
+                --platform-arn "$platform_arn" \
                 --option-settings file://options.json \
-                --tier "WebServer" \
+                --tier '{"Name":"WebServer","Type":"Standard"}' \
                 --cname-prefix "$jira_ticket_id"  # Use Jira ID for CNAME prefix
             fi
           fi
