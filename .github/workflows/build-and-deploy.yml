@@ -81,7 +81,15 @@ jobs:
             exit 1
           fi
 
+          # Create a formatted application name using only the Jira ID
+          app_name="${jira_ticket_id}-WeatherApp"  # New application name format
           env_name="${jira_ticket_id}-eb"  # Create a shorter environment name using the Jira ticket ID
+
+          # Initialize the application (will not create it if it already exists)
+          eb init "$app_name" --platform Docker --region eu-west-2 --verbose || {
+            echo "Application does not exist, creating it."
+            eb create "$app_name" --platform Docker --region eu-west-2 --verbose
+          }
 
           # Check if the environment already exists
           existing_env=$(eb list | grep ${env_name})
@@ -91,8 +99,6 @@ jobs:
             eb deploy ${env_name} --verbose  # Deploy the updated application to the existing environment
           else
             echo "Environment '${env_name}' does not exist. Creating a new environment."
-            # Initialize and deploy to Elastic Beanstalk using the determined environment name
-            eb init efi-smirnov-streamlit-demo-${branch_name} --platform Docker --region eu-west-2 --verbose  # Initialize Elastic Beanstalk application for the current branch
             eb create ${env_name} --single --verbose  # Create a new environment for the branch
             eb deploy ${env_name}  # Deploy the Docker image to the new environment
           fi
