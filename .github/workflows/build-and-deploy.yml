@@ -68,7 +68,7 @@ jobs:
           tags: streamlit-demo:latest  # Tag the Docker image as "latest" for easy reference
 
       - name: Deploy to Elastic Beanstalk environment
-        id: create-or-update-environment  # Step ID to reference the deployment step
+        id: create-or-update-environment
         run: |
           branch_name=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')  # Extract the branch name
           
@@ -88,10 +88,17 @@ jobs:
           env_name="${jira_ticket_id}"  # Create a shorter environment name using the Jira ticket ID
 
           # Initialize the application (will not create it if it already exists)
-          eb init "$app_name" --platform Docker --region eu-west-2 --verbose || {
-            echo "Application does not exist, creating it."
-            eb create "$app_name" --platform Docker --region eu-west-2 --verbose
-          }
+          if eb init "$app_name" --platform Docker --region eu-west-2 --verbose; then
+            echo "Application initialized successfully."
+          else
+            echo "Application does not exist, attempting to create it."
+            if eb create "$app_name" --platform Docker --region eu-west-2 --verbose; then
+              echo "Application created successfully."
+            else
+              echo "Failed to create application: $app_name. Exiting."
+              exit 1
+            fi
+          fi
 
           # Check if the environment already exists
           existing_env=$(eb list | grep ${env_name})
@@ -101,8 +108,13 @@ jobs:
             eb deploy ${env_name} --verbose  # Deploy the updated application to the existing environment
           else
             echo "Environment '${env_name}' does not exist. Creating a new environment."
-            eb create ${env_name} --single --verbose  # Create a new environment for the branch
-            eb deploy ${env_name}  # Deploy the Docker image to the new environment
+            if eb create ${env_name} --single --verbose; then
+              echo "Successfully created environment: ${env_name}"
+              eb deploy ${env_name}  # Deploy the Docker image to the new environment
+            else
+              echo "Failed to create environment: ${env_name}. Exiting."
+              exit 1
+            fi
           fi
 
       - name: Get Elastic Beanstalk Environment URL
@@ -110,7 +122,12 @@ jobs:
         run: |
           # Use the previously defined environment name for URL retrieval
           deployed_url=$(eb status ${env_name} | grep CNAME | awk '{print $2}')  # Get the CNAME (URL) of the newly created environment
-          echo "deployed_url=$deployed_url" >> $GITHUB_ENV  # Set the URL as an environment variable for future steps
+          if [ -n "$deployed_url" ]; then
+            echo "deployed_url=$deployed_url" >> $GITHUB_ENV  # Set the URL as an environment variable for future steps
+          else
+            echo "Failed to retrieve the deployed URL. Exiting."
+            exit 1
+          fi
 
       - name: Set Environment URL
         if: success()  # Only run this step if the previous steps were successful
