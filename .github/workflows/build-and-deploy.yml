@@ -1,5 +1,7 @@
 # Checkout Code: This step retrieves the latest code from your repository.
 # Prepare Environment: Installs necessary tools (Python, pip, and the AWS Elastic Beanstalk CLI).
+# Installing poetry dependencies
+# Caching 
 # Configure AWS Credentials: Sets up AWS credentials from GitHub secrets to interact with AWS services.
 # Login to Amazon ECR: Authenticates with Amazon Elastic Container Registry.
 # Build and Tag Docker Image: Builds the Docker image for your application.
@@ -25,16 +27,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2  # Check out the code from the repository for the current branch
 
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/pypoetry
-            ~/.local/share/pypoetry/virtualenvs
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/pyproject.toml') }}  # Use a key based on the pyproject.toml hash
-          restore-keys: |
-            ${{ runner.os }}-poetry-
-
       - name: Prepare Environment
         run: |
           sudo apt-get update  # Update the system's package index
@@ -47,6 +39,17 @@ jobs:
       - name: Install dependencies with Poetry
         run: |
           poetry install --no-interaction --no-root  # Install dependencies without creating the project environment
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.local/share/pypoetry/virtualenvs
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/pyproject.toml') }}  # Use a key based on the pyproject.toml hash
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1  # Use AWS credentials stored in GitHub secrets
@@ -108,14 +111,16 @@ jobs:
             eb deploy ${env_name} --verbose  # Deploy the updated application to the existing environment
           else
             echo "Environment '${env_name}' does not exist. Creating a new environment."
-            if eb create ${env_name} --single --verbose; then
+            if eb create ${env_name} --single --verbose 2>&1 | tee eb_create_log.txt; then
               echo "Successfully created environment: ${env_name}"
               eb deploy ${env_name}  # Deploy the Docker image to the new environment
             else
               echo "Failed to create environment: ${env_name}. Exiting."
+              echo "Error details: $(cat eb_create_log.txt)"  # Log the error details
               exit 1
             fi
           fi
+
 
       - name: Get Elastic Beanstalk Environment URL
         id: set-url  # Step ID to reference the URL later
