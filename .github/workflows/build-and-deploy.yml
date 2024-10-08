@@ -73,6 +73,7 @@ jobs:
       - name: Deploy to Elastic Beanstalk environment
         id: create-or-update-environment
         run: |
+          set -x
           branch_name=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')  # Extract the branch name
           
           # Use grep to extract the Jira ticket ID (assumes it starts with WEAT-)
