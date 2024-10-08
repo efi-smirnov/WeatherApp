@@ -5,8 +5,8 @@ FROM python:3.10-slim
 ENV POETRY_VERSION=1.8.0
 ENV PATH="/root/.local/bin:$PATH"
 
-# Expose the port on which your app will run
-EXPOSE 8501
+# Expose the default HTTP port
+EXPOSE 80
 
 # Set the working directory
 WORKDIR /app
@@ -30,5 +30,5 @@ RUN poetry install --no-dev --no-interaction --no-ansi
 # Copy the rest of the application code
 COPY . .
 
-# Command to run your Streamlit app
-CMD ["poetry", "run", "streamlit", "run", "--server.port", "8501", "weather_app/weather.py"]
+# Command to run your Streamlit app on port 80
+CMD ["poetry", "run", "streamlit", "run", "--server.port", "80", "weather_app/weather.py"]
