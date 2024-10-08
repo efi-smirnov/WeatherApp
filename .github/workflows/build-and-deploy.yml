@@ -93,11 +93,11 @@ jobs:
           env_name="${jira_ticket_id}"  # Create a shorter environment name using the Jira ticket ID
 
           # Initialize the application (will not create it if it already exists)
-          if eb init "$app_name" --platform "docker:4.0.3" --region eu-west-2 --verbose; then
+          if eb init "$app_name" --platform docker:4.0.3 --region eu-west-2 --verbose; then
             echo "Application initialized successfully."
           else
             echo "Application does not exist, attempting to create it."
-            if eb create "$app_name" --platform "docker:4.0.3" --region eu-west-2 --verbose; then
+            if eb create "$app_name" --platform docker:4.0.3 --region eu-west-2 --verbose; then
               echo "Application created successfully."
             else
               echo "Failed to create application: $app_name. Exiting."
