@@ -25,11 +25,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2  # Check out the code from the repository for the current branch
 
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.local/share/pypoetry/virtualenvs
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/pyproject.toml') }}  # Use a key based on the pyproject.toml hash
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
       - name: Prepare Environment
         run: |
           sudo apt-get update  # Update the system's package index
           sudo apt-get install python3-pip  # Install Python and pip (for package management)
           sudo pip3 install awsebcli  # Install the AWS Elastic Beanstalk CLI
+          # Install Poetry
+          curl -sSL https://install.python-poetry.org | python3 -  # Install Poetry
+          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Add Poetry to PATH
+
+      - name: Install dependencies with Poetry
+        run: |
+          poetry install --no-interaction --no-root  # Install dependencies without creating the project environment
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1  # Use AWS credentials stored in GitHub secrets
@@ -51,31 +68,34 @@ jobs:
           tags: streamlit-demo:latest  # Tag the Docker image as "latest" for easy reference
 
       - name: Deploy to Elastic Beanstalk environment
-        id: create-environment  # Step ID to reference the deployment step
+        id: create-or-update-environment  # Step ID to reference the deployment step
         run: |
           branch_name=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')  # Extract the branch name
           
-          # Check if the branch is "main"
-          if [ "$branch_name" == "main" ]; then
-            env_name="${branch_name}"  # Use "main" as the environment name
-          else
-            # Use grep to extract the Jira ticket ID (assumes it starts with WEAT-)
-            jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
-      
-            # Check if the Jira ticket ID was found
-            if [ -z "$jira_ticket_id" ]; then
-              echo "No Jira ticket ID found in branch name. Aborting deployment."
-              exit 1
-            fi
-            
-            env_name="${jira_ticket_id}-eb"  # Create a shorter environment name using the Jira ticket ID
+          # Use grep to extract the Jira ticket ID (assumes it starts with WEAT-)
+          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
+
+          # Check if the Jira ticket ID was found
+          if [ -z "$jira_ticket_id" ]; then
+            echo "No Jira ticket ID found in branch name. Aborting deployment."
+            exit 1
           fi
-      
-          # Initialize and deploy to Elastic Beanstalk using the determined environment name
-          eb init efi-smirnov-streamlit-demo-${branch_name} --platform Docker --region eu-west-2 --verbose  # Initialize Elastic Beanstalk application for the current branch
-          eb create ${env_name} --verbose  # Create a new environment for the branch
-          eb deploy ${env_name}  # Deploy the Docker image to the branch-specific Elastic Beanstalk environment
-        
+
+          env_name="${jira_ticket_id}-eb"  # Create a shorter environment name using the Jira ticket ID
+
+          # Check if the environment already exists
+          existing_env=$(eb list | grep ${env_name})
+          
+          if [ -n "$existing_env" ]; then
+            echo "Environment '${env_name}' already exists. Deploying to existing environment."
+            eb deploy ${env_name} --verbose  # Deploy the updated application to the existing environment
+          else
+            echo "Environment '${env_name}' does not exist. Creating a new environment."
+            # Initialize and deploy to Elastic Beanstalk using the determined environment name
+            eb init efi-smirnov-streamlit-demo-${branch_name} --platform Docker --region eu-west-2 --verbose  # Initialize Elastic Beanstalk application for the current branch
+            eb create ${env_name} --single --verbose  # Create a new environment for the branch
+            eb deploy ${env_name}  # Deploy the Docker image to the new environment
+          fi
 
       - name: Get Elastic Beanstalk Environment URL
         id: set-url  # Step ID to reference the URL later
