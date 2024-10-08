@@ -1,3 +1,11 @@
+# Checkout Code: This step retrieves the latest code from your repository.
+# Prepare Environment: Installs necessary tools (Python, pip, and the AWS Elastic Beanstalk CLI).
+# Configure AWS Credentials: Sets up AWS credentials from GitHub secrets to interact with AWS services.
+# Login to Amazon ECR: Authenticates with Amazon Elastic Container Registry.
+# Build and Tag Docker Image: Builds the Docker image for your application.
+# Deploy to Elastic Beanstalk Environment: Initializes and deploys your application to the specified Elastic Beanstalk environment.
+# Get Elastic Beanstalk Environment URL: Retrieves the URL of the deployed environment.
+# Set Environment URL: Outputs the deployed environment URL if the previous steps were successful.
 name: Build and Deploy Streamlit Dynamic Application
 
 on:
@@ -65,7 +73,7 @@ jobs:
 
           # Initialize and deploy to Elastic Beanstalk using the determined environment name
           eb init efi-smirnov-streamlit-demo-${branch_name} --platform Docker --region eu-west-2 --verbose  # Initialize Elastic Beanstalk application for the current branch
-          eb create ${env_name} --verbose  # Create a new environment for the branch
+          eb create ${env_name} --port 8501 --verbose  # Create a new environment for the branch
           eb deploy ${env_name}  # Deploy the Docker image to the branch-specific Elastic Beanstalk environment
 
       - name: Get Elastic Beanstalk Environment URL
