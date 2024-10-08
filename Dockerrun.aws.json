@@ -1,12 +1,20 @@
 {
-    "AWSEBDockerrunVersion": 1,
-    "Image": {
-        "Name": "streamlit-demo:latest",
-        "Update": "true"
-    },
-    "Ports": [
+    "AWSEBDockerrunVersion": 2,
+    "containerDefinitions": [
         {
-            "ContainerPort": 8501
+            "name": "weather-app",
+            "essential": true,
+            "memory": 128,
+            "portMappings": [
+                {
+                    "hostPort": 8501,
+                    "containerPort": 8501
+                }
+            ],
+            "build": {
+                "context": ".",
+                "dockerfile": "Dockerfile"
+            }
         }
     ]
 }
