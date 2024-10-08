@@ -39,7 +39,14 @@ jobs:
       - name: Remove Elastic Beanstalk environment
         run: |
           # Construct the environment name from the branch name
-          env_name="${branch_name}-eb"  # Assuming your environments follow the naming convention
+          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+')  # Extract the Jira ID from the branch name
+          if [ -n "$jira_ticket_id" ]; then
+            env_name="${jira_ticket_id}"  # Create the environment name using the Jira ID
+            app_name="${jira_ticket_id}-WeatherApp"  # Application name based on Jira ID
+          else
+            env_name="WeatherApp"  # Use the default name for the main branch
+            app_name="WeatherApp"  # Application name for the main branch
+          fi
 
           # Check if the environment name is not empty before attempting to delete
           if [ -n "$env_name" ]; then
@@ -47,4 +54,14 @@ jobs:
             eb terminate $env_name --force  # Forcefully terminate the environment
           else
             echo "No environment name found for deletion."
+          fi
+
+      - name: Remove Elastic Beanstalk application
+        run: |
+          # Check if the application name is not empty before attempting to delete
+          if [ -n "$app_name" ]; then
+            echo "Deleting Elastic Beanstalk application: $app_name"
+            eb delete $app_name --force  # Forcefully delete the application
+          else
+            echo "No application name found for deletion."
           fi

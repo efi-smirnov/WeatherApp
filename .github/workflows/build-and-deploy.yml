@@ -75,15 +75,17 @@ jobs:
           # Use grep to extract the Jira ticket ID (assumes it starts with WEAT-)
           jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
 
-          # Check if the Jira ticket ID was found
-          if [ -z "$jira_ticket_id" ]; then
-            echo "No Jira ticket ID found in branch name. Aborting deployment."
+          # Check if the branch is 'main' or if a Jira ticket ID was found
+          if [ "$branch_name" == "main" ]; then
+            app_name="WeatherApp"  # Use "WeatherApp" for the main branch
+          elif [ -n "$jira_ticket_id" ]; then
+            app_name="${jira_ticket_id}-WeatherApp"  # Use the Jira ID for other branches
+          else
+            echo "No valid application name found. Aborting deployment."
             exit 1
           fi
 
-          # Create a formatted application name using only the Jira ID
-          app_name="${jira_ticket_id}-WeatherApp"  # New application name format
-          env_name="${jira_ticket_id}-eb"  # Create a shorter environment name using the Jira ticket ID
+          env_name="${jira_ticket_id}"  # Create a shorter environment name using the Jira ticket ID
 
           # Initialize the application (will not create it if it already exists)
           eb init "$app_name" --platform Docker --region eu-west-2 --verbose || {
