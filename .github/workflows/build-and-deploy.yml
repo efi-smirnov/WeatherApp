@@ -61,7 +61,7 @@ jobs:
           else
             # Use grep to extract the Jira ticket ID (assumes it starts with WEAT-)
             jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
-
+      
             # Check if the Jira ticket ID was found
             if [ -z "$jira_ticket_id" ]; then
               echo "No Jira ticket ID found in branch name. Aborting deployment."
@@ -70,11 +70,12 @@ jobs:
             
             env_name="${jira_ticket_id}-eb"  # Create a shorter environment name using the Jira ticket ID
           fi
-
+      
           # Initialize and deploy to Elastic Beanstalk using the determined environment name
           eb init efi-smirnov-streamlit-demo-${branch_name} --platform Docker --region eu-west-2 --verbose  # Initialize Elastic Beanstalk application for the current branch
-          eb create ${env_name} --port 8501 --verbose  # Create a new environment for the branch
+          eb create ${env_name} --verbose  # Create a new environment for the branch
           eb deploy ${env_name}  # Deploy the Docker image to the branch-specific Elastic Beanstalk environment
+        
 
       - name: Get Elastic Beanstalk Environment URL
         id: set-url  # Step ID to reference the URL later
