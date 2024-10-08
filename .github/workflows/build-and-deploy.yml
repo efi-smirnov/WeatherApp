@@ -111,11 +111,14 @@ jobs:
           # Check if there are existing environments
           if [ -z "$existing_envs" ]; then
             echo "No existing environments found. Creating a new environment."
-            # Create a new environment if none exist
+            
+            # Use the correct platform-branch-name from the command you found
+            platform_branch="Docker running on 64bit Amazon Linux 2023"
+            
             aws elasticbeanstalk create-environment \
               --application-name "$app_name" \
               --environment-name "$env_name" \
-              --platform-branch-name "Docker running on 64bit Amazon Linux 2023" \
+              --platform-branch-name "$platform_branch" \
               --option-settings file://options.json \
               --tier "WebServer" \
               --cname-prefix "$jira_ticket_id"  # Use Jira ID for CNAME prefix
@@ -123,17 +126,18 @@ jobs:
             # Check if the specific environment exists
             if echo "$existing_envs" | grep -q "${env_name}"; then
               echo "Environment '${env_name}' already exists. Deploying to existing environment."
+              
               # Deploy to the existing environment
               aws elasticbeanstalk update-environment \
                 --environment-name "$env_name" \
                 --option-settings file://options.json
             else
               echo "Existing environments found, but '${env_name}' does not exist. Creating a new environment."
-              # Create a new environment if the specific one does not exist
+      
               aws elasticbeanstalk create-environment \
                 --application-name "$app_name" \
                 --environment-name "$env_name" \
-                --platform-branch-name "Docker running on 64bit Amazon Linux 2023" \
+                --platform-branch-name "$platform_branch" \
                 --option-settings file://options.json \
                 --tier "WebServer" \
                 --cname-prefix "$jira_ticket_id"  # Use Jira ID for CNAME prefix
