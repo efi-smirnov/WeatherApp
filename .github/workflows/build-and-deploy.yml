@@ -2,43 +2,62 @@ name: Build and Deploy Streamlit Dynamic Application
 
 on:
   push:
-  pull_request:
+    branches:
+      - '**'  # Trigger the workflow on any branch push
+  workflow_dispatch:  # Allow manual trigger of the workflow
 
 jobs:
   deployment:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Use the latest version of the Ubuntu runner
+    environment: 
+      name: ${{ github.ref_name }}  # The environment will be named based on the branch (e.g., "main", "feature-xyz")
+      url: ${{ steps.set-url.outputs.deployed_url }}  # Dynamically set the environment URL after deployment
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2  # Check out the code from the repository for the current branch
 
       - name: Prepare Environment
         run: |
-          sudo apt-get update
-          sudo apt-get install python3-pip
-          sudo pip3 install awsebcli
+          sudo apt-get update  # Update the system's package index
+          sudo apt-get install python3-pip  # Install Python and pip (for package management)
+          sudo pip3 install awsebcli  # Install the AWS Elastic Beanstalk CLI
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1  # Use AWS credentials stored in GitHub secrets
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-2
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Access key for AWS
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Secret access key for AWS
+          aws-region: eu-west-2  # AWS region where resources are located (Elastic Beanstalk, ECR)
 
       - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        id: login-ecr  # Step ID to reference later if needed
+        uses: aws-actions/amazon-ecr-login@v1  # Login to Amazon Elastic Container Registry (ECR)
 
       - name: Build and tag Docker image
-        id: build-image
-        uses: docker/build-push-action@v2
+        id: build-image  # Step ID to reference in future steps
+        uses: docker/build-push-action@v2  # Build a Docker image
         with:
-          context: .
-          push: false
-          tags: streamlit-demo:latest
+          context: .  # Use the current directory as the Docker build context
+          push: false  # Do not push the image to DockerHub or ECR (for local testing/building)
+          tags: streamlit-demo:latest  # Tag the Docker image as "latest" for easy reference
 
       - name: Deploy to Elastic Beanstalk environment
-        id: create-environment
+        id: create-environment  # Step ID to reference the deployment step
         run: |
-          eb init efi-smirnov-streamlit-demo-env --platform Docker --region eu-west-2 --verbose
-          eb list
-          eb deploy Efismirnovstreamlitdemoenv-env
+          branch_name=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')  # Extract the branch name
+          eb init efi-smirnov-streamlit-demo-${branch_name} --platform Docker --region eu-west-2 --verbose  # Initialize Elastic Beanstalk application for the current branch
+          eb create ${branch_name}-env --verbose  # Create a new environment for the branch
+          eb deploy ${branch_name}-env  # Deploy the Docker image to the branch-specific Elastic Beanstalk environment
+
+      - name: Get Elastic Beanstalk Environment URL
+        id: set-url  # Step ID to reference the URL later
+        run: |
+          branch_name=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')  # Extract the branch name
+          deployed_url=$(eb status ${branch_name}-env | grep CNAME | awk '{print $2}')  # Get the CNAME (URL) of the newly created environment
+          echo "deployed_url=$deployed_url" >> $GITHUB_ENV  # Set the URL as an environment variable for future steps
+
+      - name: Set Environment URL
+        if: success()  # Only run this step if the previous steps were successful
+        run: |
+          echo "Deployed URL: $deployed_url"  # Output the deployed environment URL
