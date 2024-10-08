@@ -74,9 +74,9 @@ jobs:
         id: create-or-update-environment
         run: |
           set -x
-
+      
           branch_name=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')  # Extract the branch name
-          
+      
           # Use grep to extract the Jira ticket ID (assumes it starts with WEAT-)
           jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
       
@@ -92,27 +92,26 @@ jobs:
       
           env_name="${jira_ticket_id}"  # Create a shorter environment name using the Jira ticket ID
       
-          # Check if the application exists
-          existing_app=$(aws elasticbeanstalk describe-applications --application-names "$app_name" --query "Applications[0].ApplicationName" --output text)
-      
-          if [ "$existing_app" == "$app_name" ]; then
-            echo "Application '$app_name' already exists."
+          # Initialize the application (will not create it if it already exists)
+          if eb init "$app_name" --platform docker --region eu-west-2 --verbose; then
+            echo "Application initialized successfully."
           else
             echo "Application does not exist, attempting to create it."
-            if aws elasticbeanstalk create-application --application-name "$app_name"; then
-              echo "Application '$app_name' created successfully."
+            if eb create "$app_name" --platform docker --region eu-west-2 --verbose; then
+              echo "Application created successfully."
             else
               echo "Failed to create application: $app_name. Exiting."
               exit 1
             fi
           fi
       
-          # Check for existing environments
-          existing_envs=$(aws elasticbeanstalk describe-environments --application-name "$app_name" --query "Environments[*].EnvironmentName" --output text)
+          # List existing environments and capture the output
+          existing_envs=$(eb list)
       
           # Check if there are existing environments
           if [ -z "$existing_envs" ]; then
             echo "No existing environments found. Creating a new environment."
+            # Create a new environment if none exist
             aws elasticbeanstalk create-environment \
               --application-name "$app_name" \
               --environment-name "$env_name" \
@@ -124,10 +123,13 @@ jobs:
             # Check if the specific environment exists
             if echo "$existing_envs" | grep -q "${env_name}"; then
               echo "Environment '${env_name}' already exists. Deploying to existing environment."
-              # Note: For deployments, you'll need to use a different command (like update-environment) here.
-              aws elasticbeanstalk update-environment --environment-name "$env_name" --option-settings file://options.json
+              # Deploy to the existing environment
+              aws elasticbeanstalk update-environment \
+                --environment-name "$env_name" \
+                --option-settings file://options.json
             else
               echo "Existing environments found, but '${env_name}' does not exist. Creating a new environment."
+              # Create a new environment if the specific one does not exist
               aws elasticbeanstalk create-environment \
                 --application-name "$app_name" \
                 --environment-name "$env_name" \
@@ -138,6 +140,7 @@ jobs:
             fi
           fi
         
+
 
       - name: Get Elastic Beanstalk Environment URL
         id: set-url  # Step ID to reference the URL later
