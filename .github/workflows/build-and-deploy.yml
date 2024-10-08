@@ -78,7 +78,7 @@ jobs:
           
           # Use grep to extract the Jira ticket ID (assumes it starts with WEAT-)
           jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
-
+      
           # Check if the branch is 'main' or if a Jira ticket ID was found
           if [ "$branch_name" == "main" ]; then
             app_name="WeatherApp"  # Use "WeatherApp" for the main branch
@@ -88,22 +88,22 @@ jobs:
             echo "No valid application name found. Aborting deployment."
             exit 1
           fi
-
+      
           env_name="${jira_ticket_id}"  # Create a shorter environment name using the Jira ticket ID
-
-          # Initialize the application (will not create it if it already exists)
-          if eb init "$app_name" --platform Docker --region eu-west-2 --verbose; then
+      
+          # Initialize the application with the specified Docker version
+          if eb init "$app_name" --platform "Docker running on 64bit Amazon Linux 2/4.0.3" --region eu-west-2 --verbose; then
             echo "Application initialized successfully."
           else
             echo "Application does not exist, attempting to create it."
-            if eb create "$app_name" --platform Docker --region eu-west-2 --verbose; then
+            if eb create "$app_name" --platform "Docker running on 64bit Amazon Linux 2/4.0.3" --region eu-west-2 --verbose; then
               echo "Application created successfully."
             else
               echo "Failed to create application: $app_name. Exiting."
               exit 1
             fi
           fi
-
+      
           # Check if the environment already exists
           existing_env=$(eb list | grep ${env_name})
           
@@ -112,7 +112,7 @@ jobs:
             eb deploy ${env_name} --verbose  # Deploy the updated application to the existing environment
           else
             echo "Environment '${env_name}' does not exist. Creating a new environment."
-            if eb create ${env_name} --single --verbose 2>&1 | tee eb_create_log.txt; then
+            if eb create ${env_name} --single --platform "Docker running on 64bit Amazon Linux 2/4.0.3" --verbose 2>&1 | tee eb_create_log.txt; then
               echo "Successfully created environment: ${env_name}"
               eb deploy ${env_name}  # Deploy the Docker image to the new environment
             else
