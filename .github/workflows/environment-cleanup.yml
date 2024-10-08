@@ -1,0 +1,50 @@
+name: Cleanup Elastic Beanstalk Deployment
+
+on:
+  pull_request:
+    types: [closed]  # Trigger this workflow when a pull request is closed (merged or declined)
+    branches:
+      - main  # Only consider pull requests that target the main branch
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest  # Use the latest version of the Ubuntu runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2  # Check out the code from the repository
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1  # Use AWS credentials stored in GitHub secrets
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Access key for AWS
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Secret access key for AWS
+          aws-region: eu-west-2  # AWS region where resources are located (Elastic Beanstalk)
+
+      - name: Check if pull request was merged
+        id: check-merge
+        run: |
+          if [[ "${{ github.event.pull_request.merged }}" != "true" ]]; then
+            echo "This pull request was not merged. Exiting."
+            exit 0
+          fi
+
+      - name: Get merged branch name
+        id: get-branch-name
+        run: |
+          merged_branch="${{ github.event.pull_request.head.ref }}"  # Get the source branch of the merged PR
+          echo "Merged branch name: $merged_branch"
+          echo "branch_name=$merged_branch" >> $GITHUB_ENV  # Set the branch name as an environment variable
+
+      - name: Remove Elastic Beanstalk environment
+        run: |
+          # Construct the environment name from the branch name
+          env_name="${branch_name}-eb"  # Assuming your environments follow the naming convention
+
+          # Check if the environment name is not empty before attempting to delete
+          if [ -n "$env_name" ]; then
+            echo "Deleting Elastic Beanstalk environment: $env_name"
+            eb terminate $env_name --force  # Forcefully terminate the environment
+          else
+            echo "No environment name found for deletion."
+          fi
