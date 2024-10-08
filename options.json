@@ -1,0 +1,47 @@
+[
+    {
+        "Namespace": "aws:autoscaling:launchconfiguration",
+        "OptionName": "InstanceType",
+        "Value": "t3.micro"
+    },
+    {
+        "Namespace": "aws:autoscaling:launchconfiguration",
+        "OptionName": "EC2KeyName",
+        "Value": "your-ec2-keypair"
+    },
+    {
+        "Namespace": "aws:autoscaling:launchconfiguration",
+        "OptionName": "IamInstanceProfile",
+        "Value": "your-ec2-instance-profile"
+    },
+    {
+        "Namespace": "aws:autoscaling:launchconfiguration",
+        "OptionName": "RootVolumeType",
+        "Value": "GP3"
+    },
+    {
+        "Namespace": "aws:elasticbeanstalk:environment",
+        "OptionName": "EnvironmentType",
+        "Value": "SingleInstance"
+    },
+    {
+        "Namespace": "aws:autoscaling:launchconfiguration",
+        "OptionName": "PublicIp",
+        "Value": "true"
+    },
+    {
+        "Namespace": "aws:elasticbeanstalk:healthreporting:system",
+        "OptionName": "SystemType",
+        "Value": "basic"
+    },
+    {
+        "Namespace": "aws:elasticbeanstalk:environment",
+        "OptionName": "ManagedActionsEnabled",
+        "Value": "false"
+    },
+    {
+        "Namespace": "aws:ec2:instance",
+        "OptionName": "MetadataOptions",
+        "Value": "IMDSv2"
+    }
+]
