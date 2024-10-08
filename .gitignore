@@ -3,9 +3,4 @@
 __pycache__
 .env
 .pytest_cache
-# Elastic Beanstalk Files
-.elasticbeanstalk/*
-!.elasticbeanstalk/*.cfg.yml
-!.elasticbeanstalk/*.global.yml
-.elasticbeanstalk
 deploy.sh
