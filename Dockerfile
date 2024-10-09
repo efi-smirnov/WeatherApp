@@ -31,4 +31,5 @@ RUN poetry install --no-dev --no-interaction --no-ansi
 COPY . .
 
 # Command to run your Streamlit app on port 80
-CMD ["poetry", "run", "streamlit", "run", "--server.port", "80", "weather_app/weather.py"]
+CMD ["poetry", "run", "streamlit", "run", "weather_app/weather.py", "--server.port", "80", "--server.address", "0.0.0.0"]
+
