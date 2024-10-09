@@ -132,109 +132,109 @@ jobs:
             aws elasticbeanstalk create-application --application-name "$app_name" --description "Weather application for dynamic deployment." --region eu-west-2
           fi
 
-          - name: Deploy to Elastic Beanstalk environment
-          id: create-or-update-environment
-          run: |
-            jira_ticket_id=${{ env.jira_ticket_id }}  # Retrieve the JIRA ID from environment variables
-            app_name=${{ env.app_name }}  # Retrieve the application name from environment variables
-        
-            # Function to check environment status
-            check_environment_status() {
-              local status
-              status=$(aws elasticbeanstalk describe-environments \
-                  --application-name "$app_name" \
-                  --environment-names "$jira_ticket_id" \
-                  --region "eu-west-2" \
-                  --query "Environments[0].Status" \
-                  --output text | cat)
-              echo "$status"
-            }
-            
-            # Initialize create_environment variable
-            create_environment=false 
-        
-            # Step 1: Check if the environment exists
-            existing_envs=$(aws elasticbeanstalk describe-environments \
-              --application-name "$app_name" \
-              --environment-names "$jira_ticket_id" \
-              --region "eu-west-2" \
-              --query "Environments[?EnvironmentName=='$jira_ticket_id']" \
-              --output json | cat)
-                  
-            # Check if the environment exists and check its status
-            if [ "$(echo "$existing_envs" | jq 'length')" -gt 0 ]; then
-                echo "Environment '${jira_ticket_id}' already exists."
-        
-                # If it exists, check the status
-                status=$(echo "$existing_envs" | jq -r '.[0].Status')
-                if [ "$status" == "Ready" ]; then
-                    echo "Environment '${jira_ticket_id}' is Ready. Proceeding to deploy."
-                elif [ "$status" == "Terminated" ]; then
-                    echo "Environment '${jira_ticket_id}' exists but is Terminated."
-                    echo "Creating a new environment instead."
-                    create_environment=true
-                else
-                    echo "Environment '${jira_ticket_id}' exists but is not Ready (current status: $status)."
-                    echo "Proceeding to deploy will attempt to update the environment."
-                fi
-            else
-                echo "Environment '${jira_ticket_id}' does not exist. Creating a new environment."
-                create_environment=true
-            fi
-            
-            # Step 2: Create the environment if needed
-            if [ "$create_environment" = true ]; then
-              platform_arn=$(aws elasticbeanstalk list-platform-versions \
-                  --filters "Type=PlatformBranchName,Operator=begins_with,Values=Docker running on 64bit Amazon Linux 2023" \
-                  --query "PlatformSummaryList[0].PlatformArn" --output text --region "eu-west-2" | cat)
-        
-              # Create the environment
-              aws elasticbeanstalk create-environment \
+      - name: Deploy to Elastic Beanstalk environment
+        id: create-or-update-environment
+        run: |
+          jira_ticket_id=${{ env.jira_ticket_id }}  # Retrieve the JIRA ID from environment variables
+          app_name=${{ env.app_name }}  # Retrieve the application name from environment variables
+      
+          # Function to check environment status
+          check_environment_status() {
+            local status
+            status=$(aws elasticbeanstalk describe-environments \
                 --application-name "$app_name" \
-                --environment-name "$jira_ticket_id" \
-                --platform-arn "$platform_arn" \
-                --option-settings file://options.json \
-                --tier '{"Name":"WebServer","Type":"Standard"}' \
-                --cname-prefix "$jira_ticket_id" \
-                --region "eu-west-2"
-              
-              echo "Environment creation initiated. Waiting for the environment to be Ready."
-        
-              # Wait for the environment to become ready
-              max_attempts=20
-              attempt=0
-              while [ $attempt -lt $max_attempts ]; do
-                  sleep 30  # Wait for 30 seconds before checking the status
-                  status=$(check_environment_status)
-                  echo "Current status of environment '${jira_ticket_id}': $status"
-        
-                  if [ "$status" == "Ready" ]; then
-                      echo "Environment '${jira_ticket_id}' is now Ready."
-                      break
-                  fi
-        
-                  attempt=$((attempt + 1))
-              done
-        
-              # Check if we exited the loop because we reached max attempts
-              if [ "$status" != "Ready" ]; then
-                  echo "Environment '${jira_ticket_id}' did not become Ready in the expected time."
-                  exit 1
+                --environment-names "$jira_ticket_id" \
+                --region "eu-west-2" \
+                --query "Environments[0].Status" \
+                --output text | cat)
+            echo "$status"
+          }
+          
+          # Initialize create_environment variable
+          create_environment=false 
+      
+          # Step 1: Check if the environment exists
+          existing_envs=$(aws elasticbeanstalk describe-environments \
+            --application-name "$app_name" \
+            --environment-names "$jira_ticket_id" \
+            --region "eu-west-2" \
+            --query "Environments[?EnvironmentName=='$jira_ticket_id']" \
+            --output json | cat)
+                
+          # Check if the environment exists and check its status
+          if [ "$(echo "$existing_envs" | jq 'length')" -gt 0 ]; then
+              echo "Environment '${jira_ticket_id}' already exists."
+      
+              # If it exists, check the status
+              status=$(echo "$existing_envs" | jq -r '.[0].Status')
+              if [ "$status" == "Ready" ]; then
+                  echo "Environment '${jira_ticket_id}' is Ready. Proceeding to deploy."
+              elif [ "$status" == "Terminated" ]; then
+                  echo "Environment '${jira_ticket_id}' exists but is Terminated."
+                  echo "Creating a new environment instead."
+                  create_environment=true
+              else
+                  echo "Environment '${jira_ticket_id}' exists but is not Ready (current status: $status)."
+                  echo "Proceeding to deploy will attempt to update the environment."
               fi
-            fi
-        
-            # Initialize the application (not sure if you want to include eb init here since it's already covered in your earlier steps)
-            if eb init "$app_name" --platform docker --region eu-west-2 --verbose; then
-              echo "Application initialized successfully."
-            fi
-        
-            # Step 4: Deploy to the existing or newly created environment
-            if eb deploy "$jira_ticket_id" --verbose; then  # Use jira_ticket_id directly for deployment
-                echo "Deployment to environment '${jira_ticket_id}' successful."
-            else
-                echo "Failed to deploy to environment: ${jira_ticket_id}. Exiting."
+          else
+              echo "Environment '${jira_ticket_id}' does not exist. Creating a new environment."
+              create_environment=true
+          fi
+          
+          # Step 2: Create the environment if needed
+          if [ "$create_environment" = true ]; then
+            platform_arn=$(aws elasticbeanstalk list-platform-versions \
+                --filters "Type=PlatformBranchName,Operator=begins_with,Values=Docker running on 64bit Amazon Linux 2023" \
+                --query "PlatformSummaryList[0].PlatformArn" --output text --region "eu-west-2" | cat)
+      
+            # Create the environment
+            aws elasticbeanstalk create-environment \
+              --application-name "$app_name" \
+              --environment-name "$jira_ticket_id" \
+              --platform-arn "$platform_arn" \
+              --option-settings file://options.json \
+              --tier '{"Name":"WebServer","Type":"Standard"}' \
+              --cname-prefix "$jira_ticket_id" \
+              --region "eu-west-2"
+            
+            echo "Environment creation initiated. Waiting for the environment to be Ready."
+      
+            # Wait for the environment to become ready
+            max_attempts=20
+            attempt=0
+            while [ $attempt -lt $max_attempts ]; do
+                sleep 30  # Wait for 30 seconds before checking the status
+                status=$(check_environment_status)
+                echo "Current status of environment '${jira_ticket_id}': $status"
+      
+                if [ "$status" == "Ready" ]; then
+                    echo "Environment '${jira_ticket_id}' is now Ready."
+                    break
+                fi
+      
+                attempt=$((attempt + 1))
+            done
+      
+            # Check if we exited the loop because we reached max attempts
+            if [ "$status" != "Ready" ]; then
+                echo "Environment '${jira_ticket_id}' did not become Ready in the expected time."
                 exit 1
             fi
+          fi
+      
+          # Initialize the application (not sure if you want to include eb init here since it's already covered in your earlier steps)
+          if eb init "$app_name" --platform docker --region eu-west-2 --verbose; then
+            echo "Application initialized successfully."
+          fi
+      
+          # Step 4: Deploy to the existing or newly created environment
+          if eb deploy "$jira_ticket_id" --verbose; then  # Use jira_ticket_id directly for deployment
+              echo "Deployment to environment '${jira_ticket_id}' successful."
+          else
+              echo "Failed to deploy to environment: ${jira_ticket_id}. Exiting."
+              exit 1
+          fi
         
 
       - name: Get Elastic Beanstalk Environment URL
