@@ -175,9 +175,11 @@ jobs:
               echo "Environment '${env_name}' already exists. Deploying to existing environment."
               
               # Deploy to the existing environment
-              aws elasticbeanstalk update-environment \
-                --environment-name "$env_name" \
-                --option-settings file://options.json
+              eb deploy $env_name --verbose
+              
+              # aws elasticbeanstalk update-environment \
+              #   --environment-name "$env_name" \
+              #   --option-settings file://options.json
             else
               echo "Existing environments found, but '${env_name}' does not exist. Creating a new environment."
       
