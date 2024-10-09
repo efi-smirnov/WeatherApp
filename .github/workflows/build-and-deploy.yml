@@ -76,7 +76,8 @@ jobs:
       - name: Build Docker image
         run: |
           # Use JIRA ID for the tag if exists, else "latest"
-          docker_tag=(echo ${{ env.jira_ticket_id }} | tr '[:upper:]' '[:lower:]')  # Use the value stored in environment
+          docker_tag=$(echo ${{ env.jira_ticket_id }} | tr '[:upper:]' '[:lower:]')  # Convert JIRA ID to lowercase
+
           if [ -z "$docker_tag" ]; then
             docker_tag="latest"
           fi
