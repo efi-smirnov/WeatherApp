@@ -9,7 +9,7 @@
 name: Demo Environment Variables in GitHub Actions
 
 on:
-  repository_dispatch: # Trigger this workglow only on a repository dispanch events = manually 
+  workflow_dispatch: # Trigger this workglow only on a repository dispanch events = manually 
 
 jobs:
   demo-environment-variables:
