@@ -167,7 +167,8 @@ jobs:
               --platform-arn "$platform_arn" \
               --option-settings file://options.json \
               --tier '{"Name":"WebServer","Type":"Standard"}' \
-              --cname-prefix "$jira_ticket_id"  # Use Jira ID for CNAME prefix
+              --cname-prefix "$jira_ticket_id" \ # Use Jira ID for CNAME prefix
+              --source-bundle file://Dockerrun.aws.json # Include the Dockerrun.aws.json file
           else
             # Check if the specific environment exists
             if echo "$existing_envs" | grep -q "${env_name}"; then
@@ -176,7 +177,8 @@ jobs:
               # Deploy to the existing environment
               aws elasticbeanstalk update-environment \
                 --environment-name "$env_name" \
-                --option-settings file://options.json
+                --option-settings file://options.json \
+                --source-bundle file://Dockerrun.aws.json
             else
               echo "Existing environments found, but '${env_name}' does not exist. Creating a new environment."
       
@@ -186,7 +188,8 @@ jobs:
                 --platform-arn "$platform_arn" \
                 --option-settings file://options.json \
                 --tier '{"Name":"WebServer","Type":"Standard"}' \
-                --cname-prefix "$jira_ticket_id"  # Use Jira ID for CNAME prefix
+                --cname-prefix "$jira_ticket_id" \ # Use Jira ID for CNAME prefix
+                --source-bundle file://Dockerrun.aws.json # Include the Dockerrun.aws.json file
             fi
           fi
 
