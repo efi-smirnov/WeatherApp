@@ -115,37 +115,35 @@ jobs:
             ]
           }" > Dockerrun.aws.json
 
+      - name: Create or Update Elastic Beanstalk Application
+        id: create-application
+        run: |
+          app_name="WeatherApp"  # Use a fixed application name
+          
+          # Check if the application exists
+          existing_apps=$(aws elasticbeanstalk describe-applications --query "Applications[*].ApplicationName" --output text)
+
+          if echo "$existing_apps" | grep -q "$app_name"; then
+            echo "Application '$app_name' already exists."
+          else
+            # Create the application if it does not exist
+            echo "Creating application '$app_name'."
+            aws elasticbeanstalk create-application --application-name "$app_name" --description "Weather application for dynamic deployment." --region eu-west-2
+          fi
+
       - name: Deploy to Elastic Beanstalk environment
         id: create-or-update-environment
         run: |
           branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')  # Extract the branch name
           jira_ticket_id=${{ env.jira_ticket_id }}  # Retrieve the JIRA ID from environment variables
           
-          # Check if the branch is 'main' or if a Jira ticket ID was found
-          if [ "$branch_name" == "main" ]; then
-            app_name="WeatherApp"  # Use "WeatherApp" for the main branch
-          elif [ -n "$jira_ticket_id" ]; then
-            app_name="${jira_ticket_id}-WeatherApp"  # Use the Jira ID for other branches
-          else
-            echo "No valid application name found. Aborting deployment."
-            exit 1
-          fi
-          
-          env_name="${jira_ticket_id}"  # Create a shorter environment name using the Jira ticket ID
+          env_name="${jira_ticket_id:-$branch_name}"  # Create environment name using JIRA ID or branch name
 
           # Initialize the application (will not create it if it already exists)
           if eb init "$app_name" --platform docker --region eu-west-2 --verbose; then
             echo "Application initialized successfully."
-          else
-            echo "Application does not exist, attempting to create it."
-            if eb create "$app_name" --platform docker --region eu-west-2 --verbose; then
-              echo "Application created successfully."
-            else
-              echo "Failed to create application: $app_name. Exiting."
-              exit 1
-            fi
           fi
-          
+
           # Get the platform ARN
           platform_arn=$(aws elasticbeanstalk list-platform-versions \
             --filters "Type=PlatformBranchName,Operator=begins_with,Values=Docker running on 64bit Amazon Linux 2023" \
@@ -154,44 +152,20 @@ jobs:
           # List existing environments and capture the output
           existing_envs=$(eb list)
           
-          # Check if there are existing environments
-          if [ -z "$existing_envs" ]; then
-            echo "No existing environments found. Creating a new environment."
-            
-            # Use the correct platform-branch-name from the command you found
-            platform_branch="Docker running on 64bit Amazon Linux 2023"
-            
+          # Check if the environment already exists
+          if echo "$existing_envs" | grep -q "${env_name}"; then
+            echo "Environment '${env_name}' already exists. Deploying to existing environment."
+            eb deploy $env_name --verbose  # Deploy to the existing environment
+          else
+            echo "Creating a new environment '${env_name}'."
             aws elasticbeanstalk create-environment \
               --application-name "$app_name" \
               --environment-name "$env_name" \
               --platform-arn "$platform_arn" \
               --option-settings file://options.json \
               --tier '{"Name":"WebServer","Type":"Standard"}' \
-              --cname-prefix "$jira_ticket_id" \ # Use Jira ID for CNAME prefix
-              --source-bundle file://Dockerrun.aws.json # Include the Dockerrun.aws.json file
-          else
-            # Check if the specific environment exists
-            if echo "$existing_envs" | grep -q "${env_name}"; then
-              echo "Environment '${env_name}' already exists. Deploying to existing environment."
-              
-              # Deploy to the existing environment
-              eb deploy $env_name --verbose
-              
-              # aws elasticbeanstalk update-environment \
-              #   --environment-name "$env_name" \
-              #   --option-settings file://options.json
-            else
-              echo "Existing environments found, but '${env_name}' does not exist. Creating a new environment."
-      
-              aws elasticbeanstalk create-environment \
-                --application-name "$app_name" \
-                --environment-name "$env_name" \
-                --platform-arn "$platform_arn" \
-                --option-settings file://options.json \
-                --tier '{"Name":"WebServer","Type":"Standard"}' \
-                --cname-prefix "$jira_ticket_id" \ # Use Jira ID for CNAME prefix
-                --source-bundle file://Dockerrun.aws.json # Include the Dockerrun.aws.json file
-            fi
+              --cname-prefix "${jira_ticket_id:-$branch_name}" \  # Use JIRA ID or branch name for CNAME prefix
+              --source-bundle file://Dockerrun.aws.json  # Include the Dockerrun.aws.json file
           fi
 
       - name: Get Elastic Beanstalk Environment URL
