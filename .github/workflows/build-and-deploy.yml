@@ -83,10 +83,12 @@ jobs:
 
           # Build Docker image and tag it
           docker build -t ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag .
+          echo "Docker image built and tagged as ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag"
 
       - name: Push Docker image to DockerHub
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag  # Push image to DockerHub
+          echo "Docker image was pushed to ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag"
 
       - name: Generate Dockerrun.aws.json file
         run: |
