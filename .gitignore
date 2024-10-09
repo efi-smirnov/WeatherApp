@@ -9,3 +9,4 @@ __pycache__
 !.elasticbeanstalk/*.global.yml
 .elasticbeanstalk
 deploy.sh
+deploy-template.yml

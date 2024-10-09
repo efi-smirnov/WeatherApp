@@ -30,7 +30,7 @@ jobs:
       - name: Prepare Environment
         run: |
           sudo apt-get update  # Update the system's package index
-          sudo apt-get install python3-pip  # Install Python and pip (for package management)
+          sudo apt-get install -y python3-pip  # Install Python and pip (for package management)
           sudo pip3 install awsebcli  # Install the AWS Elastic Beanstalk CLI
           # Install Poetry
           curl -sSL https://install.python-poetry.org | python3 -  # Install Poetry
@@ -50,6 +50,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-
 
+      - name: Set up branch and JIRA ID
+        id: setup
+        run: |
+          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')  # Extract branch name
+          echo "branch_name=$branch_name" >> $GITHUB_ENV  # Set branch name as an environment variable
+          
+          # Extract JIRA ticket ID
+          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
+          echo "jira_ticket_id=$jira_ticket_id" >> $GITHUB_ENV  # Set JIRA ticket ID as an environment variable
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1  # Use AWS credentials stored in GitHub secrets
@@ -58,26 +67,55 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Secret access key for AWS
           aws-region: eu-west-2  # AWS region where resources are located (Elastic Beanstalk, ECR)
 
-      - name: Login to Amazon ECR
-        id: login-ecr  # Step ID to reference later if needed
-        uses: aws-actions/amazon-ecr-login@v1  # Login to Amazon Elastic Container Registry (ECR)
-
-      - name: Build and tag Docker image
-        id: build-image  # Step ID to reference in future steps
-        uses: docker/build-push-action@v2  # Build a Docker image
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
         with:
-          context: .  # Use the current directory as the Docker build context
-          push: false  # Do not push the image to DockerHub or ECR (for local testing/building)
-          tags: streamlit-demo:latest  # Tag the Docker image as "latest" for easy reference
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker image
+        run: |
+          # Use JIRA ID for the tag if exists, else "latest"
+          docker_tag=${{ env.jira_ticket_id }}  # Use the value stored in environment
+          if [ -z "$docker_tag" ]; then
+            docker_tag="latest"
+          fi
+
+          # Build Docker image and tag it
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag .
+
+      - name: Push Docker image to DockerHub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag  # Push image to DockerHub
+
+      - name: Generate Dockerrun.aws.json file
+        run: |
+          # Set the image tag based on the branch or Jira ticket
+          image_tag=${{ env.jira_ticket_id }}  # Use the value stored in environment
+          if [ -z "$image_tag" ]; then
+            image_tag="latest"
+          fi
+
+          # Create the Dockerrun.aws.json file dynamically
+          echo "{
+            \"AWSEBDockerrunVersion\": 1,
+            \"Image\": {
+              \"Name\": \"${{ secrets.DOCKER_USERNAME }}/weather-app:$image_tag\",
+              \"Update\": \"true\"
+            },
+            \"Ports\": [
+              {
+                \"ContainerPort\": \"8501\"
+              }
+            ]
+          }" > Dockerrun.aws.json
 
       - name: Deploy to Elastic Beanstalk environment
         id: create-or-update-environment
         run: |
-          branch_name=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')  # Extract the branch name
-      
-          # Use grep to extract the Jira ticket ID (assumes it starts with WEAT-)
-          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
-      
+          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')  # Extract the branch name
+          jira_ticket_id=${{ env.jira_ticket_id }}  # Retrieve the JIRA ID from environment variables
+          
           # Check if the branch is 'main' or if a Jira ticket ID was found
           if [ "$branch_name" == "main" ]; then
             app_name="WeatherApp"  # Use "WeatherApp" for the main branch
@@ -87,7 +125,7 @@ jobs:
             echo "No valid application name found. Aborting deployment."
             exit 1
           fi
-      
+          
           env_name="${jira_ticket_id}"  # Create a shorter environment name using the Jira ticket ID
 
           # Initialize the application (will not create it if it already exists)
@@ -102,15 +140,15 @@ jobs:
               exit 1
             fi
           fi
-      
-          # get the platform ARN
+          
+          # Get the platform ARN
           platform_arn=$(aws elasticbeanstalk list-platform-versions \
             --filters "Type=PlatformBranchName,Operator=begins_with,Values=Docker running on 64bit Amazon Linux 2023" \
             --query "PlatformSummaryList[0].PlatformArn" --output text | cat)
 
-            # List existing environments and capture the output
+          # List existing environments and capture the output
           existing_envs=$(eb list)
-      
+          
           # Check if there are existing environments
           if [ -z "$existing_envs" ]; then
             echo "No existing environments found. Creating a new environment."
@@ -146,13 +184,10 @@ jobs:
                 --cname-prefix "$jira_ticket_id"  # Use Jira ID for CNAME prefix
             fi
           fi
-        
-
 
       - name: Get Elastic Beanstalk Environment URL
-        id: set-url  # Step ID to reference the URL later
+        id: set-url
         run: |
-          # Use the previously defined environment name for URL retrieval
           deployed_url=$(eb status ${env_name} | grep CNAME | awk '{print $2}')  # Get the CNAME (URL) of the newly created environment
           if [ -n "$deployed_url" ]; then
             echo "deployed_url=$deployed_url" >> $GITHUB_ENV  # Set the URL as an environment variable for future steps
