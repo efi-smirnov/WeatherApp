@@ -1,12 +1,12 @@
 branch-defaults:
   WEAT-3-Deploy-the-weather-app-to-AWS-Elastic-Beanstalk:
-    environment: WEAT-3
+    environment: null
 environment-defaults:
   WEAT-3:
     branch: null
     repository: null
 global:
-  application_name: WEAT-3-WeatherApp
+  application_name: WeatherApp
   branch: null
   default_ec2_keyname: null
   default_platform: Docker

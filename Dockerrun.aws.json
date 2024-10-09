@@ -1,0 +1,12 @@
+{
+    "AWSEBDockerrunVersion": 1,
+    "Image": {
+        "Name": "jevgenix/weather-app:weat-3",
+        "Update": "true"
+    },
+    "Ports": [
+        {
+            "ContainerPort": 8501
+        }
+    ]
+}
