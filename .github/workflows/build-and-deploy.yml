@@ -29,17 +29,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Extract JIRA Ticket ID
-        id: setup-jira-id
-        run: |
-          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')
-          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
-          if [ -z "$jira_ticket_id" ]; then
-            echo "No JIRA ID found in branch name. Exiting."
-            exit 1
-          fi
-          echo "JIRA_TICKET_ID=$jira_ticket_id" >> $GITHUB_ENV
-
       - name: Prepare Environment
         run: |
           sudo apt-get update  # Update the system's package index
@@ -48,6 +37,7 @@ jobs:
           # Install Poetry
           curl -sSL https://install.python-poetry.org | python3 -  # Install Poetry
           echo "$HOME/.local/bin" >> $GITHUB_PATH  # Add Poetry to PATH
+          chmod +x .github/scripts/*.sh
 
       - name: Install dependencies with Poetry
         run: |
@@ -62,7 +52,7 @@ jobs:
           key: ${{ runner.os }}-poetry-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-poetry-
-
+  
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -75,6 +65,17 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract JIRA Ticket ID
+        id: setup-jira-id
+        run: |
+          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')
+          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
+          if [ -z "$jira_ticket_id" ]; then
+            echo "No JIRA ID found in branch name. Exiting."
+            exit 1
+          fi
+          echo "JIRA_TICKET_ID=$jira_ticket_id" >> $GITHUB_ENV
 
       - name: Build and Push Docker image
         run: |
