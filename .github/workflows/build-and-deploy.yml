@@ -1,13 +1,3 @@
-# Checkout Code: This step retrieves the latest code from your repository.
-# Prepare Environment: Installs necessary tools (Python, pip, and the AWS Elastic Beanstalk CLI).
-# Installing poetry dependencies
-# Caching 
-# Configure AWS Credentials: Sets up AWS credentials from GitHub secrets to interact with AWS services.
-# Login to Amazon ECR: Authenticates with Amazon Elastic Container Registry.
-# Build and Tag Docker Image: Builds the Docker image for your application.
-# Deploy to Elastic Beanstalk Environment: Initializes and deploys your application to the specified Elastic Beanstalk environment.
-# Get Elastic Beanstalk Environment URL: Retrieves the URL of the deployed environment.
-# Set Environment URL: Outputs the deployed environment URL if the previous steps were successful.
 name: Build and Deploy Streamlit Dynamic Application
 
 on:
@@ -39,6 +29,21 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH  # Add Poetry to PATH
           chmod +x .github/scripts/*.sh
 
+      - name: Extract JIRA Ticket ID
+        id: setup-jira-id
+        run: |
+          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')
+          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
+
+          if [ -z "$jira_ticket_id" ]; then
+            echo "No JIRA ID found in branch name. Using APP_NAME as environment name."
+            echo "JIRA_TICKET_ID=latest" >> $GITHUB_ENV
+            echo "ENVIRONMENT_NAME=${{ env.APP_NAME }}" >> $GITHUB_ENV
+          else
+            echo "JIRA_TICKET_ID=$jira_ticket_id" >> $GITHUB_ENV
+            echo "ENVIRONMENT_NAME=$jira_ticket_id" >> $GITHUB_ENV
+          fi
+
       - name: Install dependencies with Poetry
         run: |
           poetry install --no-interaction --no-root
@@ -66,20 +71,9 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract JIRA Ticket ID
-        id: setup-jira-id
-        run: |
-          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')
-          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
-          if [ -z "$jira_ticket_id" ]; then
-            echo "No JIRA ID found in branch name. Exiting."
-            exit 1
-          fi
-          echo "JIRA_TICKET_ID=$jira_ticket_id" >> $GITHUB_ENV
-
       - name: Build and Push Docker image
         run: |
-          docker_tag=$(echo ${{ env.JIRA_TICKET_ID }} | tr '[:upper:]' '[:lower:]')
+          docker_tag="${{ env.JIRA_TICKET_ID }}"  # Use the JIRA_TICKET_ID or "latest"
           docker build -t ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag .
           docker push ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag
 
@@ -87,7 +81,7 @@ jobs:
         run: ./.github/scripts/generate-dockerrun-aws-json.sh ${{ env.JIRA_TICKET_ID }} ${{ secrets.DOCKER_USERNAME }} ${{ env.CONTAINER_PORT }}
 
       - name: Create or Update Elastic Beanstalk Environment
-        run: ./.github/scripts/create-or-update-environment.sh ${{ env.APP_NAME }} ${{ env.JIRA_TICKET_ID }} ${{ env.AWS_REGION }}
+        run: ./.github/scripts/create-or-update-environment.sh ${{ env.APP_NAME }} ${{ env.ENVIRONMENT_NAME }} ${{ env.AWS_REGION }}
 
       - name: Set Environment URL
         if: success()
