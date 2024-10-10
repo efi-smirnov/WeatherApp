@@ -4,12 +4,20 @@ on:
   push:
     branches:
       - '**'
+  pull_request:
+    branches:
+      - '**'
+  workflow_run:
+    workflows: ["CI Workflow"]
+    types:
+      - completed
+  
   workflow_dispatch:
 
 jobs:
   deployment:
     runs-on: ubuntu-latest
-    
+
     env:
       AWS_REGION: "eu-west-2"
       APP_NAME: "WeatherApp"
