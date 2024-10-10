@@ -2,7 +2,12 @@ name: Cleanup Elastic Beanstalk Deployment
 
 on:
   pull_request:
-    types: [closed]  # Trigger this workflow when a pull request is closed (merged or declined)
+    types: [closed]
+  workflow_run:
+    workflows: ["Build and Deploy Streamlit Dynamic Application"]
+    types:
+      - completed 
+
 
 jobs:
   cleanup:
@@ -16,6 +21,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2  # Check out the code from the repository
+
+      - name: Environment setup
+        run: |
+          sudo apt-get update  # Update the system's package index
+          sudo apt-get install -y python3-pip  # Install Python and pip (for package management)
+          sudo pip3 install awsebcli  # Install the AWS Elastic Beanstalk CLI
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1  # Use AWS credentials stored in GitHub secrets
