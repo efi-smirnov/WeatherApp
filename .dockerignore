@@ -1,0 +1,6 @@
+.env
+.elasticbeanstalk
+deploy.sh
+DC_Store
+.pytest_cache
+__pycache__

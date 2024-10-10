@@ -81,7 +81,7 @@ class WeatherApp:
     def run(self):
         """Main method to run the Streamlit weather app."""
         st.set_page_config(layout="centered")  # Center the content
-        st.title("Weather App 🌤️")
+        st.title("Hello from Eficode! 🌤️")
 
         # Get latitude, longitude, and city from the external API
         lat, lon, city_name = self.get_coordinates()

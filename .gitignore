@@ -1,6 +1,15 @@
 .DC_Store
-poetry.lock
 .vscode
 __pycache__
 .env
 .pytest_cache
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+.elasticbeanstalk
+deploy.sh
+deploy-template.yml
+create-env.sh
+test.sh
+demo_actions

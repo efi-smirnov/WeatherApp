@@ -1,0 +1,55 @@
+name: Cleanup Elastic Beanstalk Deployment
+
+on:
+  pull_request:
+    types: [closed]  # Trigger this workflow when a pull request is closed (merged or declined)
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest  # Use the latest version of the Ubuntu runner
+    env:
+      AWS_REGION: "eu-west-2"
+      APP_NAME: "WeatherApp"
+      MERGED_BRANCH: ${{ github.event.pull_request.head.ref }}  # Get the merged branch name
+      BASE_BRANCH: ${{ github.event.pull_request.base.ref }}  # Get the base branch name
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2  # Check out the code from the repository
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1  # Use AWS credentials stored in GitHub secrets
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Access key for AWS
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Secret access key for AWS
+          aws-region: ${{ env.AWS_REGION }}  # AWS region where resources are located (Elastic Beanstalk)
+
+      - name: Check if pull request was merged
+        id: check-merge
+        run: |
+          if [[ "${{ github.event.pull_request.merged }}" != "true" ]]; then
+            echo "This pull request was not merged. Exiting."
+            exit 0
+          fi
+
+      - name: Remove Elastic Beanstalk environment
+        run: |
+          # Construct the environment name from the merged branch name
+          jira_ticket_id=$(echo "${{ env.MERGED_BRANCH }}" | grep -oE 'WEAT-[0-9]+')  # Extract the Jira ID from the merged branch name
+          
+          # Determine environment name based on the branch that is being merged
+          if [[ "${{ env.BASE_BRANCH }}" == "main" ]]; then
+            # If merging into main, use the branch that is being merged
+            env_name="${jira_ticket_id}"  # Environment name based on the Jira ID
+          else
+            # For other branches, use the merged branch name
+            env_name="${{ env.MERGED_BRANCH }}"  # Use the merged branch name for the environment
+          fi
+
+          # Check if the environment name is not empty before attempting to delete
+          if [ -n "$env_name" ]; then
+            echo "Deleting Elastic Beanstalk environment: $env_name"
+            eb terminate $env_name --force  # Forcefully terminate the environment
+          else
+            echo "No environment name found for deletion."
+          fi

@@ -1,0 +1,27 @@
+[
+    {
+        "Namespace": "aws:autoscaling:launchconfiguration",
+        "OptionName": "InstanceType",
+        "Value": "t3.micro"
+    },
+    {
+        "Namespace": "aws:autoscaling:launchconfiguration",
+        "OptionName": "IamInstanceProfile",
+        "Value": "aws-elasticbeanstalk-ec2-role"
+    },
+    {
+        "Namespace": "aws:autoscaling:launchconfiguration",
+        "OptionName": "RootVolumeType",
+        "Value": "gp3"
+    },
+    {
+        "Namespace": "aws:elasticbeanstalk:environment",
+        "OptionName": "EnvironmentType",
+        "Value": "SingleInstance"
+    },
+    {
+        "Namespace": "aws:elasticbeanstalk:healthreporting:system",
+        "OptionName": "SystemType",
+        "Value": "basic"
+    }
+]

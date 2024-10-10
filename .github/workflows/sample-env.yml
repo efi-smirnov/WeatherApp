@@ -1,0 +1,74 @@
+# Static environment variables
+# Dynamic environment variables
+# Job-level environment variables
+# Refernencing step outputs
+# Confitional Steps
+# Secrets
+
+
+name: Demo Environment Variables in GitHub Actions
+
+on:
+  workflow_dispatch: # Trigger this workglow only on a repository dispanch events = manually 
+
+jobs:
+  demo-environment-variables:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Static Environment Variable: 
+      - name: Static Environment Variable
+        env:
+          STATIC_ENV_VAR: "Monica"
+        run: |
+          echo "I am static environment variable, and my name is: $STATIC_ENV_VAR"
+
+      - name: another static var
+        env:
+          STATIC_ENV_VAR: "Diana"
+        run: |
+          echo "I am another static environment variable, and my name is: $STATIC_ENV_VAR"
+
+      # Dynamic Environment Variable
+      - name: Dynamic Environment Variable
+        id: dynamic-var
+        run: |
+          echo "DYNAMIC-VAR= Janica" >> $GITHUB_ENV
+          echo "Dynamic env variable created."
+      
+      - name: Use Dynamic Environment Variable
+        run: |
+          echo "I am Dynamic Variable, and my name is: $DYNAMIC-VAR"
+
+      # Job-level Environment Variable
+      - name: Job-level Environment Variable
+        env:
+          JOB_ENB_VAR: "Anna"
+        run: |
+          echo "I am job-level environment variable, and my name is: $JOB_ENB_VAR"
+
+      # Secret environment variable
+
+      # Referencing step outputs
+      - name: Referencing Step outpus
+        run: |
+          echo "The value of Dynamic Environment Variable is: ${{ steps.dynamic-var.outputs.DYNAMIC-VAR }}"
+
+      # set and use environment variable in a confitional step
+      - name: Set Conditional Environment Variable
+        run: |
+          echo "CONDITIONAL_VAR=Rachel" >> $GITHUB_ENV
+          echo "Conditional environment variable created."
+
+      - name: Compare condidional variable with a secret
+        env:
+          SECRET_NAME: ${{ secrets.SECRET_ENV_VARIABLE }}
+        if: ${{ env.CONDITIONAL_VAR == env.SECRET_NAME }} 
+        run: |
+          echo "WOW, we have same names!"
+      
+
+      
+
+# Static Variables: Fixed values defined at the beginning.
+# Dynamic Variables: Can be modified or created during the execution of the workflow.

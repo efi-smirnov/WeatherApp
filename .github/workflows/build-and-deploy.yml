@@ -1,0 +1,99 @@
+name: Build and Deploy Streamlit Dynamic Application
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+  workflow_run:
+    workflows: ["CI Workflow"]
+    types:
+      - completed
+  
+  workflow_dispatch:
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: "eu-west-2"
+      APP_NAME: "WeatherApp"
+      CONTAINER_PORT: 8501
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Prepare Environment
+        run: |
+          sudo apt-get update  # Update the system's package index
+          sudo apt-get install -y python3-pip  # Install Python and pip (for package management)
+          sudo pip3 install awsebcli  # Install the AWS Elastic Beanstalk CLI
+          # Install Poetry
+          curl -sSL https://install.python-poetry.org | python3 -  # Install Poetry
+          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Add Poetry to PATH
+          chmod +x .github/scripts/*.sh
+
+      - name: Extract Environment Tag
+        id: setup-env-tag
+        run: |
+          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')
+          env_tag=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
+
+          if [ -z "$env_tag" ]; then
+            echo "No JIRA ID found in branch name. Using APP_NAME as environment name."
+            echo "ENVIRONMENT_TAG=latest" >> $GITHUB_ENV
+            echo "ENVIRONMENT_NAME=${{ env.APP_NAME }}" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT_TAG=$env_tag" >> $GITHUB_ENV
+            echo "ENVIRONMENT_NAME=$env_tag" >> $GITHUB_ENV
+          fi
+
+      - name: Install dependencies with Poetry
+        run: |
+          poetry install --no-interaction --no-root
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.local/share/pypoetry/virtualenvs
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+  
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Docker image
+        run: |
+          docker_tag="${{ env.ENVIRONMENT_TAG }}"  # Use the ENVIRONMENT_TAG or "latest"
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag .
+          docker push ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag
+
+      - name: Generate Dockerrun.aws.json file
+        run: ./.github/scripts/generate-dockerrun-aws-json.sh ${{ env.ENVIRONMENT_TAG }} ${{ secrets.DOCKER_USERNAME }} ${{ env.CONTAINER_PORT }}
+
+      - name: Create or Update Elastic Beanstalk Environment
+        run: ./.github/scripts/create-or-update-environment.sh ${{ env.APP_NAME }} ${{ env.ENVIRONMENT_NAME }} ${{ env.AWS_REGION }}
+
+      - name: Set Environment URL
+        if: success()
+        run: |
+          echo "Deployed URL: ${{ env.deployed_url }}"
