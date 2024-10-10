@@ -6,7 +6,9 @@ on:
       - '**'
   pull_request:
     branches:
-      - '**'
+      - main
+    types:
+      - closed
   workflow_run:
     workflows: ["CI Workflow"]
     types:
