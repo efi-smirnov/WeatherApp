@@ -3,12 +3,15 @@ name: Cleanup Elastic Beanstalk Deployment
 on:
   pull_request:
     types: [closed]  # Trigger this workflow when a pull request is closed (merged or declined)
-    branches:
-      - main  # Only consider pull requests that target the main branch
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest  # Use the latest version of the Ubuntu runner
+    env:
+      AWS_REGION: "eu-west-2"
+      APP_NAME: "WeatherApp"
+      MERGED_BRANCH: ${{ github.event.pull_request.head.ref }}  # Get the merged branch name
+      BASE_BRANCH: ${{ github.event.pull_request.base.ref }}  # Get the base branch name
 
     steps:
       - name: Checkout code
@@ -19,7 +22,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Access key for AWS
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Secret access key for AWS
-          aws-region: eu-west-2  # AWS region where resources are located (Elastic Beanstalk)
+          aws-region: ${{ env.AWS_REGION }}  # AWS region where resources are located (Elastic Beanstalk)
 
       - name: Check if pull request was merged
         id: check-merge
@@ -29,23 +32,18 @@ jobs:
             exit 0
           fi
 
-      - name: Get merged branch name
-        id: get-branch-name
-        run: |
-          merged_branch="${{ github.event.pull_request.head.ref }}"  # Get the source branch of the merged PR
-          echo "Merged branch name: $merged_branch"
-          echo "branch_name=$merged_branch" >> $GITHUB_ENV  # Set the branch name as an environment variable
-
       - name: Remove Elastic Beanstalk environment
         run: |
-          # Construct the environment name from the branch name
-          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+')  # Extract the Jira ID from the branch name
-          if [ -n "$jira_ticket_id" ]; then
-            env_name="${jira_ticket_id}"  # Create the environment name using the Jira ID
-            app_name="${jira_ticket_id}-WeatherApp"  # Application name based on Jira ID
+          # Construct the environment name from the merged branch name
+          jira_ticket_id=$(echo "${{ env.MERGED_BRANCH }}" | grep -oE 'WEAT-[0-9]+')  # Extract the Jira ID from the merged branch name
+          
+          # Determine environment name based on the branch that is being merged
+          if [[ "${{ env.BASE_BRANCH }}" == "main" ]]; then
+            # If merging into main, use the branch that is being merged
+            env_name="${jira_ticket_id}"  # Environment name based on the Jira ID
           else
-            env_name="WeatherApp"  # Use the default name for the main branch
-            app_name="WeatherApp"  # Application name for the main branch
+            # For other branches, use the merged branch name
+            env_name="${{ env.MERGED_BRANCH }}"  # Use the merged branch name for the environment
           fi
 
           # Check if the environment name is not empty before attempting to delete
@@ -54,14 +52,4 @@ jobs:
             eb terminate $env_name --force  # Forcefully terminate the environment
           else
             echo "No environment name found for deletion."
-          fi
-
-      - name: Remove Elastic Beanstalk application
-        run: |
-          # Check if the application name is not empty before attempting to delete
-          if [ -n "$app_name" ]; then
-            echo "Deleting Elastic Beanstalk application: $app_name"
-            eb delete $app_name --force  # Forcefully delete the application
-          else
-            echo "No application name found for deletion."
           fi
