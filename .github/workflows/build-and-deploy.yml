@@ -13,32 +13,36 @@ name: Build and Deploy Streamlit Dynamic Application
 on:
   push:
     branches:
-      - '**'  # Trigger the workflow on any branch push
-  workflow_dispatch:  # Allow manual trigger of the workflow
+      - '**'
+  workflow_dispatch:
 
 jobs:
   deployment:
-    runs-on: ubuntu-latest  # Use the latest version of the Ubuntu runner
-    environment: 
-      name: ${{ github.ref_name }}  # The environment will be named based on the branch (e.g., "main", "feature-xyz")
-      url: ${{ steps.set-url.outputs.deployed_url }}  # Dynamically set the environment URL after deployment
+    runs-on: ubuntu-latest
+    
+    env:
+      AWS_REGION: "eu-west-2"
+      APP_NAME: "WeatherApp"
+      CONTAINER_PORT: 8501
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2  # Check out the code from the repository for the current branch
+        uses: actions/checkout@v2
 
-      - name: Prepare Environment
+      - name: Extract JIRA Ticket ID
+        id: setup-jira-id
         run: |
-          sudo apt-get update  # Update the system's package index
-          sudo apt-get install -y python3-pip  # Install Python and pip (for package management)
-          sudo pip3 install awsebcli  # Install the AWS Elastic Beanstalk CLI
-          # Install Poetry
-          curl -sSL https://install.python-poetry.org | python3 -  # Install Poetry
-          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Add Poetry to PATH
+          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')
+          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
+          if [ -z "$jira_ticket_id" ]; then
+            echo "No JIRA ID found in branch name. Exiting."
+            exit 1
+          fi
+          echo "JIRA_TICKET_ID=$jira_ticket_id" >> $GITHUB_ENV
 
       - name: Install dependencies with Poetry
         run: |
-          poetry install --no-interaction --no-root  # Install dependencies without creating the project environment
+          poetry install --no-interaction --no-root
 
       - name: Cache Poetry dependencies
         uses: actions/cache@v3
@@ -46,26 +50,16 @@ jobs:
           path: |
             ~/.cache/pypoetry
             ~/.local/share/pypoetry/virtualenvs
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/pyproject.toml') }}  # Use a key based on the pyproject.toml hash
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-poetry-
 
-      - name: Set up branch and JIRA ID
-        id: setup
-        run: |
-          branch_name=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///')  # Extract branch name
-          echo "branch_name=$branch_name" >> $GITHUB_ENV  # Set branch name as an environment variable
-          
-          # Extract JIRA ticket ID
-          jira_ticket_id=$(echo "$branch_name" | grep -oE 'WEAT-[0-9]+' | head -n 1)
-          echo "jira_ticket_id=$jira_ticket_id" >> $GITHUB_ENV  # Set JIRA ticket ID as an environment variable
-
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1  # Use AWS credentials stored in GitHub secrets
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Access key for AWS
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Secret access key for AWS
-          aws-region: eu-west-2  # AWS region where resources are located (Elastic Beanstalk, ECR)
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to DockerHub
         uses: docker/login-action@v2
@@ -73,182 +67,19 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build Docker image
+      - name: Build and Push Docker image
         run: |
-          # Use JIRA ID for the tag if exists, else "latest"
-          docker_tag=$(echo ${{ env.jira_ticket_id }} | tr '[:upper:]' '[:lower:]')  # Convert JIRA ID to lowercase
-
-          if [ -z "$docker_tag" ]; then
-            docker_tag="latest"
-          fi
-          
-          echo "docker_tag=$docker_tag" >> $GITHUB_ENV
-
-          # Build Docker image and tag it
+          docker_tag=$(echo ${{ env.JIRA_TICKET_ID }} | tr '[:upper:]' '[:lower:]')
           docker build -t ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag .
-          echo "Docker image built and tagged as ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag"
-
-      - name: Push Docker image to DockerHub
-        run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag  # Push image to DockerHub
-          echo "Docker image was pushed to ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag"
+          docker push ${{ secrets.DOCKER_USERNAME }}/weather-app:$docker_tag
 
       - name: Generate Dockerrun.aws.json file
-        run: |
-          # Set the image tag based on the branch or Jira ticket
-          image_tag=${{ env.jira_ticket_id }}  # Use the value stored in environment
-          if [ -z "$image_tag" ]; then
-            image_tag="latest"
-          fi
+        run: ./.github/scripts/generate-dockerrun-aws-json.sh ${{ env.JIRA_TICKET_ID }} ${{ secrets.DOCKER_USERNAME }} ${{ env.CONTAINER_PORT }}
 
-          # Create the Dockerrun.aws.json file dynamically
-          echo "{
-            \"AWSEBDockerrunVersion\": 1,
-            \"Image\": {
-              \"Name\": \"${{ secrets.DOCKER_USERNAME }}/weather-app:$image_tag\",
-              \"Update\": \"true\"
-            },
-            \"Ports\": [
-              {
-                \"ContainerPort\": \"8501\"
-              }
-            ]
-          }" > Dockerrun.aws.json
-
-      - name: Create or Update Elastic Beanstalk Application
-        id: create-application
-        run: |
-          app_name="WeatherApp"  # Use a fixed application name
-          echo "app_name=$app_name" >> $GITHUB_ENV
-          
-          # Check if the application exists
-          existing_apps=$(aws elasticbeanstalk describe-applications --query "Applications[*].ApplicationName" --output text)
-
-          if echo "$existing_apps" | grep -q "$app_name"; then
-            echo "Application '$app_name' already exists."
-          else
-            # Create the application if it does not exist
-            echo "Creating application '$app_name'."
-            aws elasticbeanstalk create-application --application-name "$app_name" --description "Weather application for dynamic deployment." --region eu-west-2
-          fi
-
-      - name: Deploy to Elastic Beanstalk environment
-        id: create-or-update-environment
-        run: |
-          jira_ticket_id=${{ env.jira_ticket_id }}  # Retrieve the JIRA ID from environment variables
-          app_name=${{ env.app_name }}  # Retrieve the application name from environment variables
-      
-          # Function to check environment status
-          check_environment_status() {
-            local status
-            status=$(aws elasticbeanstalk describe-environments \
-                --application-name "$app_name" \
-                --environment-names "$jira_ticket_id" \
-                --region "eu-west-2" \
-                --query "Environments[0].Status" \
-                --output text | cat)
-            echo "$status"
-          }
-          
-          # Initialize create_environment variable
-          create_environment=false 
-      
-          # Step 1: Check if the environment exists
-          existing_envs=$(aws elasticbeanstalk describe-environments \
-            --application-name "$app_name" \
-            --environment-names "$jira_ticket_id" \
-            --region "eu-west-2" \
-            --query "Environments[?EnvironmentName=='$jira_ticket_id']" \
-            --output json | cat)
-                
-          # Check if the environment exists and check its status
-          if [ "$(echo "$existing_envs" | jq 'length')" -gt 0 ]; then
-              echo "Environment '${jira_ticket_id}' already exists."
-      
-              # If it exists, check the status
-              status=$(echo "$existing_envs" | jq -r '.[0].Status')
-              if [ "$status" == "Ready" ]; then
-                  echo "Environment '${jira_ticket_id}' is Ready. Proceeding to deploy."
-              elif [ "$status" == "Terminated" ]; then
-                  echo "Environment '${jira_ticket_id}' exists but is Terminated."
-                  echo "Creating a new environment instead."
-                  create_environment=true
-              else
-                  echo "Environment '${jira_ticket_id}' exists but is not Ready (current status: $status)."
-                  echo "Proceeding to deploy will attempt to update the environment."
-              fi
-          else
-              echo "Environment '${jira_ticket_id}' does not exist. Creating a new environment."
-              create_environment=true
-          fi
-          
-          # Step 2: Create the environment if needed
-          if [ "$create_environment" = true ]; then
-            platform_arn=$(aws elasticbeanstalk list-platform-versions \
-                --filters "Type=PlatformBranchName,Operator=begins_with,Values=Docker running on 64bit Amazon Linux 2023" \
-                --query "PlatformSummaryList[0].PlatformArn" --output text --region "eu-west-2" | cat)
-      
-            # Create the environment
-            aws elasticbeanstalk create-environment \
-              --application-name "$app_name" \
-              --environment-name "$jira_ticket_id" \
-              --platform-arn "$platform_arn" \
-              --option-settings file://options.json \
-              --tier '{"Name":"WebServer","Type":"Standard"}' \
-              --cname-prefix "$jira_ticket_id" \
-              --region "eu-west-2"
-            
-            echo "Environment creation initiated. Waiting for the environment to be Ready."
-      
-            # Wait for the environment to become ready
-            max_attempts=20
-            attempt=0
-            while [ $attempt -lt $max_attempts ]; do
-                sleep 30  # Wait for 30 seconds before checking the status
-                status=$(check_environment_status)
-                echo "Current status of environment '${jira_ticket_id}': $status"
-      
-                if [ "$status" == "Ready" ]; then
-                    echo "Environment '${jira_ticket_id}' is now Ready."
-                    break
-                fi
-      
-                attempt=$((attempt + 1))
-            done
-      
-            # Check if we exited the loop because we reached max attempts
-            if [ "$status" != "Ready" ]; then
-                echo "Environment '${jira_ticket_id}' did not become Ready in the expected time."
-                exit 1
-            fi
-          fi
-      
-          # Initialize the application (not sure if you want to include eb init here since it's already covered in your earlier steps)
-          if eb init "$app_name" --platform docker --region eu-west-2 --verbose; then
-            echo "Application initialized successfully."
-          fi
-      
-          # Step 4: Deploy to the existing or newly created environment
-          if eb deploy "$jira_ticket_id" --verbose; then  # Use jira_ticket_id directly for deployment
-              echo "Deployment to environment '${jira_ticket_id}' successful."
-          else
-              echo "Failed to deploy to environment: ${jira_ticket_id}. Exiting."
-              exit 1
-          fi
-        
-
-      - name: Get Elastic Beanstalk Environment URL
-        id: set-url
-        run: |
-          deployed_url=$(eb status ${env_name} | grep CNAME | awk '{print $2}')  # Get the CNAME (URL) of the newly created environment
-          if [ -n "$deployed_url" ]; then
-            echo "deployed_url=$deployed_url" >> $GITHUB_ENV  # Set the URL as an environment variable for future steps
-          else
-            echo "Failed to retrieve the deployed URL. Exiting."
-            exit 1
-          fi
+      - name: Create or Update Elastic Beanstalk Environment
+        run: ./.github/scripts/create-or-update-environment.sh ${{ env.APP_NAME }} ${{ env.JIRA_TICKET_ID }} ${{ env.AWS_REGION }}
 
       - name: Set Environment URL
-        if: success()  # Only run this step if the previous steps were successful
+        if: success()
         run: |
-          echo "Deployed URL: $deployed_url"  # Output the deployed environment URL
+          echo "Deployed URL: ${{ env.deployed_url }}"

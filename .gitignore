@@ -12,3 +12,4 @@ deploy.sh
 deploy-template.yml
 create-env.sh
 test.sh
+demo_actions
