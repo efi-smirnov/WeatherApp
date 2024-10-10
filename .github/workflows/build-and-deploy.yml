@@ -40,6 +40,15 @@ jobs:
           fi
           echo "JIRA_TICKET_ID=$jira_ticket_id" >> $GITHUB_ENV
 
+      - name: Prepare Environment
+        run: |
+          sudo apt-get update  # Update the system's package index
+          sudo apt-get install -y python3-pip  # Install Python and pip (for package management)
+          sudo pip3 install awsebcli  # Install the AWS Elastic Beanstalk CLI
+          # Install Poetry
+          curl -sSL https://install.python-poetry.org | python3 -  # Install Poetry
+          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Add Poetry to PATH
+
       - name: Install dependencies with Poetry
         run: |
           poetry install --no-interaction --no-root
